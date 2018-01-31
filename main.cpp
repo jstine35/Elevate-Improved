@@ -205,15 +205,17 @@ std::wstring xStringFormat(const WCHAR* fmt, ...)
     return result;
 }
 
-HRESULT ev_GetEnvironmentVariable(const WCHAR* varname, std::wstring& dest)
+std::wstring ev_GetEnvironmentVariable(const WCHAR* varname)
 {
     WCHAR temp[xMaxEnviron];
     if (auto hr = GetEnvironmentVariable(varname, temp, _countof(temp))) {
-        dest = temp;
-        return 0;
+        return std::wstring(temp, hr);
     }
     else {
-        return GetLastError();
+        log_error(L"WARN- GetEnvironmentVariable('%s') failed.\nWindow error 0x%08x - %s\n",
+            varname, hr, HRESULT_to_string(hr).c_str()
+        );
+        return {};
     }
 }
 
@@ -329,15 +331,11 @@ std::wstring FindBestExt(const std::wstring& appName)
 
     // no extension, use $PATHEXT to figure out what the extension might be.
 
-    std::wstring environVarBuffer;
     std::wstring thisExt;
     std::wstring appTry;
 
-    HRESULT hr = ev_GetEnvironmentVariable(L"PATHEXT", environVarBuffer);
-    if (hr) {
-        log_error(L"WARN- GetEnvironmentVariable('PATHEXT') failed.\nWindow error 0x%08x - %s\n", hr, HRESULT_to_string(hr).c_str());
-        return {};
-    }
+    auto environVarBuffer = ev_GetEnvironmentVariable(L"PATHEXT");
+    if (environVarBuffer.empty()) { return {}; }
 
     // Need to slice this string according to semi-colon.
     // after much deliberation, strtok the old-old-fashioned way:
@@ -390,16 +388,14 @@ std::wstring escape_quotes(const WCHAR* src)
 
 int ExecComspec(const ArgContainer& cmdargs, const Ev_ShellExecFlags& flags_in)
 {
-    std::wstring environVarBuffer;
-    std::wstring CmdLineBuffer;
-
     Ev_ShellExecFlags flags = flags_in;
     if (flags.HideWindow && flags.ComspecRemains) {
         log_error(L"WARN- refusing to hide an interactive COMSPEC since it leads to\n");
         log_error(L"  an orphaned process.\n");
     }
 
-    if (HRESULT hr = ev_GetEnvironmentVariable( L"COMSPEC", environVarBuffer)) {
+    auto environVarBuffer =  ev_GetEnvironmentVariable(L"COMSPEC");
+    if (environVarBuffer.empty()) {
         log_error(L"ERROR- %%COMSPEC%% environment variable is undefined or empty.\n");
         log_error(L"  %%COMSPEC%% must be defined when specifying switches -c|-k\n");
         _exit(EXIT_FAILURE);
@@ -429,10 +425,12 @@ int ExecComspec(const ArgContainer& cmdargs, const Ev_ShellExecFlags& flags_in)
     // Yup, just add that quote.  CMD has some twisted bizarre way of handling quotes and nested quotes.
     // while parsing /C and /K:  As far as I can tell, a double-quote at the start of the command will
     // direct cmd.exe to interpret the rest of the command line as a single command -- no need to escape
-    // nested quotes or even provide the closing quote.  So that's what we do!
+    // nested quotes.  So that's what we do!  Updated: providing closing quote is needed to fix behavior
+    // when specifying multiple commands on
 
-    //                                  \/  and there's our mystery quote that makes it all work.
-    CmdLineBuffer = xStringFormat(L"/%c \" cd /d \"%s\" %s %s",
+    //                                       \/  and there's our mystery quote that makes it all work.
+    //                                                            \/ and the closing quote here!
+    auto CmdLineBuffer = xStringFormat(L"/%c \" cd /d \"%s\" %s %s\"",
         flags.ComspecRemains ? L'K' : L'C',
         ev_GetCurrentDir().c_str(),
         cmdargs.size() ? L"&&" : L"",
@@ -759,9 +757,9 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
             L" --hide         - Hides the program from view; may not be honored by all programs\n"
             L"                  Hide is ignored when -k is specified.\n"
             L" --show         - Shows program/console window (default)\n"
-            L" -k             - Invokes the specified command using CMD /K\n"
+            L" -k             - Invokes the specified command using %COMSPEC% /K\n"
             L"                  An interactive CMD prompt will remain open.\n"
-            L" -c             - Invokes the specified command using CMD /C\n"
+            L" -c             - Invokes the specified command using %COMSPEC% /C\n"
             L"                  This does not offer any specific advantages over normal elevation and\n"
             L"                  is provided primarily for diagnostic purposes\n"
             L" --version      - Print app version to STDOUT and exit immediately.\n"
@@ -799,7 +797,7 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
         log_console(
             L"Application        = %s\n"
             L"App Arguments      = %s\n",
-            startComspec ? L"cmd.exe" : executable_fullpath.c_str(),
+            startComspec ? L"%COMSPEC%" : executable_fullpath.c_str(),
             xStringJoin(L" ", cmd_arguments).c_str()
         );
     }
