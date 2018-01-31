@@ -169,6 +169,7 @@ union Ev_ShellExecFlags {
         uint32_t    ComspecRemains      : 1;
         uint32_t    DoNotWaitForProc    : 1;
         uint32_t    HideWindow          : 1;
+        uint32_t    nakedQuotes         : 1;
     };
 };
 
@@ -360,14 +361,14 @@ std::wstring FindBestExt(const std::wstring& appName)
     }
 }
 
-std::wstring escape_quotes(const WCHAR* src)
+std::wstring escape_quotes(const WCHAR* src, bool nakedQuotes)
 {
     if (!src) return {};
 
     bool hasSpace = 0;
     std::wstring result;
     while(src[0]) {
-        if (src[0] == L'"') {
+        if (src[0] == L'"' && !nakedQuotes) {
             result += L"\\";
         }
         hasSpace = hasSpace || (src[0] == L' ') || (src[0] == L'\t') || (src[0] == L'\r') || (src[0] == L'\n');
@@ -558,7 +559,7 @@ int ExecAssoc(const std::wstring& executable_fullpath, const ArgContainer& cmdar
                 if (!reargs.empty()) {
                     reargs += L" ";
                 }
-                reargs += escape_quotes(reparsed[n]);
+                reargs += escape_quotes(reparsed[n], flags_in.nakedQuotes);
             }
             return ShellExec(reparsed[0], reargs.c_str(), flags_in);
         }
@@ -609,10 +610,10 @@ std::wstring GetToolchainDesc()
 int __cdecl wmain(int Argc, WCHAR* Argv[])
 {
     Ev_ShellExecFlags shflags = { 0 };
-    bool startComspec   = false;
-    bool FlagsRead      = false;
-    bool showHelp       = false;
-    bool showVersion    = false;
+    bool startComspec   = 0;
+    bool FlagsRead      = 0;
+    bool showHelp       = 0;
+    bool showVersion    = 0;
 
     // Because CMD shell defers cli parsing to individual applications, there are two ways to process the command line:
     //   A. Parse the original command line ourselves and then feed the original string arguments into ShellExec
@@ -669,6 +670,23 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
                 else if (wcscmp(switchName, L"nowait") == 0) {
                     shflags.DoNotWaitForProc = 1;
                 }
+                else if (wcscmp(switchName, L"comspec") == 0) {
+                    if (startComspec && shflags.ComspecRemains) {
+                        log_error(L"Warning- Duplicate specification of `-c` after `-k`, previous switch is ignored.\n");
+                    }
+                    startComspec            = 1;
+                    shflags.ComspecRemains  = 0;
+                }
+                else if (wcscmp(switchName, L"interactive") == 0) {
+                    if (startComspec && !shflags.ComspecRemains) {
+                        log_error(L"Warning- Duplicate specification of `-k` after `-c`, previous switch is ignored.\n");
+                    }
+                    startComspec            = 1;
+                    shflags.ComspecRemains  = 1;
+                }
+                else if (wcscmp(switchName, L"naked-quotes") == 0) {
+                    shflags.nakedQuotes     = 1;
+                }
                 else if (wcscmp(switchName, L"version") == 0) {
                     showVersion = 1;
                 }
@@ -695,19 +713,22 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
                 else if (flag == L'?' || flag == L'h') {
                     showHelp = 1;
                 }
+                else if ((flag == L'C' || flag == L'c')) {
+                    if (startComspec && shflags.ComspecRemains) {
+                        log_error(L"Warning- Duplicate specification of `-c` after `-k`, previous switch is ignored.\n");
+                    }
+                    startComspec            = 1;
+                    shflags.ComspecRemains  = 0;
+                }
                 else if (flag == L'K' || flag == L'k') {
                     if (startComspec && !shflags.ComspecRemains) {
-                        log_error(L"Warning- Duplicate specification of `/K` after `/C`, previous switch is ignored.\n");
+                        log_error(L"Warning- Duplicate specification of `-k` after `-c`, previous switch is ignored.\n");
                     }
                     startComspec            = 1;
                     shflags.ComspecRemains  = 1;
                 }
-                else if ((flag == L'C' || flag == L'c')) {
-                    if (startComspec && shflags.ComspecRemains) {
-                        log_error(L"Warning- Duplicate specification of `/C` after `/K`, previous switch is ignored.\n");
-                    }
-                    startComspec            = 1;
-                    shflags.ComspecRemains  = 0;
+                else if ((flag == L'Q' || flag == L'q')) {
+                    shflags.nakedQuotes     = 1;
                 }
                 else {
                     log_error(L"ERROR- Unrecognized Flag `%c` in argument `%s`\n", flag, Argv[i]);
@@ -723,7 +744,7 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
                 executable_fullpath = Argv[i];
             }
             else if (Argv[i] && Argv[i][0]) {
-                auto escaped = escape_quotes(Argv[i]);
+                auto escaped = escape_quotes(Argv[i], shflags.nakedQuotes);
                 total_len += int(escaped.length()) + 1;
                 cmd_arguments.push_back(escaped);
 
@@ -751,17 +772,19 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
         log_console(
             L"\n"
             L"Usage: eudo [switches] [--] [program] [args]\n"
-            L" -? | --help    - Shows this help\n"
-            L" --wait         - Waits until program terminates (default)\n"
-            L" --nowait       - Runs the program and then immediately returns\n"
-            L" --hide         - Hides the program from view; may not be honored by all programs\n"
-            L"                  Hide is ignored when -k is specified.\n"
-            L" --show         - Shows program/console window (default)\n"
-            L" -k             - Invokes the specified command using %COMSPEC% /K\n"
-            L"                  An interactive CMD prompt will remain open.\n"
-            L" -c             - Invokes the specified command using %COMSPEC% /C\n"
-            L"                  This does not offer any specific advantages over normal elevation and\n"
-            L"                  is provided primarily for diagnostic purposes\n"
+            L" -?|--help   - Shows this help\n"
+            L" --wait      - Waits until program terminates (default)\n"
+            L" --nowait    - Runs the program and then immediately returns\n"
+            L" --hide      - Hides the program from view; may not be honored by all programs\n"
+            L"               Hide is ignored when -k is specified.\n"
+            L" --show      - Shows program/console window (default)\n"
+            L" -k|--interactive  - Invokes the specified command using %COMSPEC% /K\n"
+            L"               An interactive CMD prompt will remain open.\n"
+            L" -c|--comspec      - Invokes the specified command using %COMSPEC% /C\n"
+            L"               This does not offer any specific advantages over normal elevation and\n"
+            L"               is provided primarily for diagnostic purposes\n"
+            L" -q|--naked-quotes - Disables automatic double-quote escaping. For programs such as\n"
+            L"               CMD.EXE that do not parse double quotes in the expected way.\n"
             L" --version      - Print app version to STDOUT and exit immediately.\n"
             L" --verbose      - Enables diagnostic logging.\n"
             L"\n"
@@ -807,10 +830,12 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
         debug_log(
             L"startComspec       = %c\n"
             L"ComspecRemains     = %c\n"
+            L"NakedQuotes        = %c\n"
             L"HideWindow         = %c\n"
             L"WaitForProcess     = %c\n",
             startComspec                ? L'Y' : L'N',
             shflags.ComspecRemains      ? L'Y' : L'N',
+            shflags.nakedQuotes         ? L'Y' : L'N',
             willHideWindow              ? L'Y' : L'N',
             shflags.DoNotWaitForProc    ? L'N' : L'Y'
         );
