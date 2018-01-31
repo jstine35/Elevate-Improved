@@ -47,7 +47,8 @@ systems. I believe that feature could be added to the utility in the future, how
 since technically Linux and Windows fundamentally differ in their security models -- Linux does not have a concept of *elevation*
 of the current user.  If that caveat can be resolved cleanly to allow for interoperable behavior between `bash/sh` scripts run on
 either Windows/Linux OS, then at that point this utility could be re-released under the `sudo` moniker.  Ideally such a utility
-could then also be bundled with the likes of **MSYS/MinGW** or **Git for Windows**. 
+could then also be bundled with the likes of **MSYS/MinGW** or **Git for Windows**, though for that to happen the tool should be
+adapted to use the MSYS CoreUtils framework, which has a ton of CLI advantages over Microsoft's CRT.
 
 ### History
 
