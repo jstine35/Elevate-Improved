@@ -259,10 +259,22 @@ std::wstring ev_AssocQueryString(ASSOCSTR str, const std::wstring& extension)
 }
 
 
-int ShellExec(const WCHAR* ApplicationName, const WCHAR* CommandLine, const Ev_ShellExecFlags& flags)
+int ShellExec(const std::wstring& ApplicationName, const std::wstring& CommandLine, const Ev_ShellExecFlags& flags)
 {
     if (g_Verbose) {
-        log_console(L"ShellExec(\n  App  = %s\n  Args = %s\n)\n", ApplicationName, CommandLine);
+        log_console(L"ShellExec(\n  App  = %s\n  Args = %s\n)\n", ApplicationName.c_str(), CommandLine.c_str());
+    }
+
+    if (ApplicationName.length() >= xMaxPath) {
+        log_error(L"ERROR- Application name is too long.\n");
+        log_error(L"  Limit is %d chars, actual length is %d chars\n", xMaxEnviron, CommandLine.length());
+        return EXIT_FAILURE;
+    }
+
+    if (CommandLine.length() >= xMaxEnviron) {
+        log_error(L"ERROR- command line is too long.");
+        log_error(L"  Limit is %d chars, actual length is %d chars\n", xMaxEnviron, CommandLine.length());
+        return EXIT_FAILURE;
     }
 
     SHELLEXECUTEINFO Shex = {};
@@ -276,8 +288,8 @@ int ShellExec(const WCHAR* ApplicationName, const WCHAR* CommandLine, const Ev_S
     auto cwd = ev_GetCurrentDir();
 
     Shex.lpVerb         = L"runas";
-    Shex.lpFile         = ApplicationName;
-    Shex.lpParameters   = CommandLine;
+    Shex.lpFile         = ApplicationName.c_str();
+    Shex.lpParameters   = CommandLine.c_str();
     Shex.nShow          = flags.HideWindow ? SW_HIDE : SW_SHOW;
 
     if (!ShellExecuteEx(&Shex))
@@ -285,8 +297,8 @@ int ShellExec(const WCHAR* ApplicationName, const WCHAR* CommandLine, const Ev_S
         HRESULT Err = HRESULT_FROM_WIN32(GetLastError());
 
         log_error(
-            L"%s could not be launched\nWindows Error 0x%08x - %s \n",
-            ApplicationName,
+            L"ERROR- could not launch app '%s'\nWindows Error 0x%08x - %s \n",
+            ApplicationName.c_str(),
             Err,
             HRESULT_to_string(Err).c_str()
 
