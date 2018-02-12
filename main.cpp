@@ -308,14 +308,14 @@ int ShellExec(const std::wstring& ApplicationName, const std::wstring& CommandLi
 
     _ASSERTE(Shex.hProcess);
 
+    DWORD procExitCode = EXIT_SUCCESS;
     if (!flags.DoNotWaitForProc)
     {
-        DWORD procExitCode;
         WaitForSingleObject(Shex.hProcess, INFINITE);
         GetExitCodeProcess (Shex.hProcess, &procExitCode);
     }
     CloseHandle (Shex.hProcess);
-    return EXIT_SUCCESS;
+    return procExitCode;
 }
 
 std::wstring xStringJoin(const WCHAR* joiner, const ArgContainer& container)
