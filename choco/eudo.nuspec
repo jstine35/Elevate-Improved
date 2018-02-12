@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>eudo</id>
+    <version>0.1.0</version>
+    <title>eudo (Install)</title>
+    <authors>Jake Stine</authors>
+    <projectUrl>https://github.com/jstine35/eudo</projectUrl>
+    <copyright>2018</copyright>
+    <licenseUrl>https://github.com/jstine35/eudo/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/jstine35/eudo</projectSourceUrl>
+    <docsUrl>https://github.com/jstine35/eudo/blob/master/README.md</docsUrl>
+    <tags>eudo sudo elevate admin administrator privileges</tags>
+    <summary>Executes a program or shell command with elevated admin privileges</summary>
+    <description>Executes a specified command or executable process with elevated administration rights, as according to the UAC security model introduced by Windows Vista. The user will be prompted for elevated permissions to the specified process/command if the user has UAC enabled.</description>
+
+	<!-- MArkdown OK in releaseNotes -->
+    <releaseNotes>Initial Release</releaseNotes>
+  </metadata>
+  <files>
+    <!-- this section controls what actually gets packaged into the Chocolatey package -->
+    <file src="tools\**" target="tools" />
+	<file src="..\bin\x64\Release\eudo.exe" target="bin" />
+    <!--Building from Linux? You may need this instead: <file src="tools/**" target="tools" />-->
+  </files>
+</package>
