@@ -26,7 +26,7 @@
 // This program has no goal or intention of being cross-compiled or cross-platform compatible.
 #pragma warning(disable:4201)
 
-// No reason not to use OutputDebugString at all times.  It's a perfectly valid use case that a developer
+// No reason not to use OutputDebugString at all times. It's a perfectly valid use case that a developer
 // might want to attach a debugger to the release build of this process and capture it's output.
 #if !defined(USE_OUTPUT_DEBUG_STRING)
 #   ifdef _DEBUG
@@ -670,7 +670,7 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
                     FlagsRead = 1;
                     continue;
                 }
-                auto switchName = &Argv[i][2];
+                auto* switchName = Argv[i] + 2;
 
                 if (0) { }      // just for else if code alignment
                 else if (wcscmp(switchName, L"help") == 0) {
@@ -781,27 +781,27 @@ int __cdecl wmain(int Argc, WCHAR* Argv[])
             version, _T(__DATE__), GetToolchainDesc().c_str()
         );
 
-        log_console(
+        log_console(L"%s",
             L"\n"
             L"Usage: eudo [switches] [--] [program] [args]\n"
-            L" -?|--help   - Shows this help\n"
-            L" --wait      - Waits until program terminates (default)\n"
-            L" --nowait    - Runs the program and then immediately returns\n"
-            L" --hide      - Hides the program from view; may not be honored by all programs\n"
-            L"               Hide is ignored when -k is specified.\n"
-            L" --show      - Shows program/console window (default)\n"
-            L" -k|--interactive  - Invokes the specified command using %COMSPEC% /K\n"
-            L"               An interactive CMD prompt will remain open.\n"
-            L" -c|--comspec      - Invokes the specified command using %COMSPEC% /C\n"
-            L"               This does not offer any specific advantages over normal elevation and\n"
-            L"               is provided primarily for diagnostic purposes\n"
-            L" -q|--naked-quotes - Disables automatic double-quote escaping. For programs such as\n"
-            L"               CMD.EXE that do not parse double quotes in the expected way.\n"
-            L" --version      - Print app version to STDOUT and exit immediately.\n"
-            L" --verbose      - Enables diagnostic logging.\n"
+            L" -?|--help          Shows this help\n"
+            L" --wait             Waits until program terminates (default)\n"
+            L" --nowait           Runs the program and then immediately returns\n"
+            L" --hide             Hides the program from view; may not be honored by all programs\n"
+            L"                    Hide is ignored when -k is specified.\n"
+            L" --show             Shows program/console window (default)\n"
+            L" -k|--interactive   Invokes the specified command using %COMSPEC% /K\n"
+            L"                    An interactive CMD prompt will remain open.\n"
+            L" -c|--comspec       Invokes the specified command using %COMSPEC% /C\n"
+            L"                    This does not offer any specific advantages over normal elevation and\n"
+            L"                    is provided primarily for diagnostic purposes\n"
+            L" -q|--naked-quotes  Disables automatic double-quote escaping. For programs such as\n"
+            L"                    CMD.EXE that do not parse double quotes in the expected way.\n"
+            L" --version          Print app version to STDOUT and exit immediately.\n"
+            L" --verbose          Enables diagnostic logging.\n"
             L"\n"
-            L" program        - The program to execute; required unless -c|-k is specified\n"
-            L" args           - command line arguments passed through to the program (optional)\n"
+            L" program            The program to execute; required unless -c|-k is specified\n"
+            L" args               command line arguments passed through to the program (optional)\n"
             L"\n"
             L"Use `--` to forcibly stop options parsing and begin program and arguments parsing.\n"
             L"This should be used when the target executable filename begins with a dash or double dash.\n"
